@@ -1,2 +1,17 @@
+# Ignore all files from out 
 out/
+
+# Visual Studio folder
 .vs/
+
+# Visual Studio Code settings
+.vscode/
+
+# CLion settings
+.idea/
+
+# CMake build directory
+build/
+
+# Ignore the .dist
+.dist/

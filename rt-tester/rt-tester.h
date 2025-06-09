@@ -15,7 +15,7 @@
 #endif
 #endif
 
-#define VERSION "1.0"
+#define VERSION "1.1"
 
 #define RESET   "\033[0m"
 #define BLACK   "\033[30m"      /* Black */
@@ -35,15 +35,33 @@
 #define BOLDCYAN    "\033[1m\033[36m"      /* Bold Cyan */
 #define BOLDWHITE   "\033[1m\033[37m"      /* Bold White */
 
-struct task_data {
+/// @brief Task data structure for periodic tasks. \struct task_data
+struct task_data
+{
     long period_ns;
     long print_per_sec;
+    int stress_threads;
+    int duration_sec;
+    int policy;
+    int priority;
+    const char* log_file;
+    bool use_color;
 };
 
-struct period_info {
+/// @brief Periodic task information structure. \struct period_info
+struct period_info
+{
     struct timespec next_period;
     long period_ns;
     long print_rate;
+    
+    // Statistics
+    unsigned long total_cycles;
+    long double total_delay;
+    long double max_delay;
+    long double min_delay;
+    unsigned long missed_deadlines;
 };
+
 
 #endif //RT_TESTER_H
