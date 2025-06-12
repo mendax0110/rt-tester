@@ -30,6 +30,7 @@
 #include <getopt.h>
 #include <float.h>
 #include <signal.h>
+//#include <stdatomic.h>
 
 #include "rt-tester.h"
 
@@ -46,7 +47,6 @@
 
 volatile sig_atomic_t keep_running = 1;
 volatile sig_atomic_t print_stats = 0;
-
 
 /**
  * @brief The signal handler function to handle termination signals.
@@ -111,10 +111,10 @@ void print_help(const char* progname)
     printf("  -r, --rate HZ         Console refresh rate in Hz (default: 5)\n");
     printf("  -d, --duration SEC    Run for specified seconds then exit\n");
     printf("  -s, --stress N        Number of CPU stress threads (default: 0)\n");
-    printf("  --policy POL          Scheduling policy (other|rr|fifo, default: fifo)\n");
-    printf("  --priority PRI        Thread priority (1-99 for RT policies, default: 80)\n");
+    printf("  -pol, --policy POL    Scheduling policy (other|rr|fifo, default: fifo)\n");
+    printf("  -pri, --priority PRI  Thread priority (1-99 for RT policies, default: 80)\n");
     printf("  -l, --log FILE        Log output to file\n");
-    printf("  --no-color            Disable colored output\n");
+    printf("  -nc, --no-color       Disable colored output\n");
     printf("  -i, --info            Show platform information\n");
     printf("  -h, --help            Show this help message\n");
 }
@@ -140,12 +140,12 @@ void print_logo(long tid, int policy, int priority, long double period_ms, long 
     
     printf("%s", color_start);
     printf(R"(
-  ____ _____   _            _            
- |  _ \_   _| | |_ ___  ___| |_ ___ _ __ 
- | |_) || |   | __/ _ \/ __| __/ _ \ '__|
- |  _ < | |   | ||  __/\__ \ ||  __/ |   
- |_| \_\|_|    \__\___||___/\__\___|_|    ver: %s                                       
-)",
+     ____ _____   _            _            
+    |  _ \_   _| | |_ ___  ___| |_ ___ _ __ 
+    | |_) || |   | __/ _ \/ __| __/ _ \ '__|
+    |  _ < | |   | ||  __/\__ \ ||  __/ |   
+    |_| \_\|_|    \__\___||___/\__\___|_|    ver: %s
+    )",
     VERSION);
     printf("%s", color_end);
 
@@ -179,9 +179,13 @@ void print_logo(long tid, int policy, int priority, long double period_ms, long 
 void* cpu_stressor(void* arg)
 {
     (void)arg;
+    volatile int dummyTask = 0;
     while (1)
     {
-        for (int i = 0; i < 1000000; i++);
+        for (int i = 0; i < 1000000; i++)
+        {
+            dummyTask++;
+        }
     }
     return NULL;
 }
@@ -202,6 +206,7 @@ void spawn_stress_threads(int count)
         pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
         if (pthread_create(&t, &attr, cpu_stressor, NULL) != 0)
         {
+            pthread_attr_destroy(&attr);
             perror("Failed to create stress thread");
         }
     }
@@ -262,8 +267,11 @@ static void periodic_task_init(struct period_info* pinfo, long period_ns, long p
  */
 static void wait_rest_of_period(struct period_info* pinfo)
 {
+    int ret;
     inc_period(pinfo);
-    clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &pinfo->next_period, NULL);
+    do {
+        ret = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &pinfo->next_period, NULL);
+    } while (ret == EINTR);
 }
 
 /**
@@ -288,6 +296,25 @@ static void print_statistics(const struct period_info* pinfo, bool use_color)
     printf("  Miss rate: %s%.2f%%%s\n", color_start, 
            (pinfo->total_cycles > 0 ? (100.0 * pinfo->missed_deadlines / pinfo->total_cycles) : 0), 
            color_end);
+}
+
+void draw_delay_graph(const struct period_info* pinfo, long double current_delay_ns, int width, bool use_color)
+{
+    const int graph_width = width > 0 ? width : 50;
+    const long double max_ms = 2.0;
+    int bar_length = (int)((current_delay_ns / 1000000.0) / max_ms * graph_width);
+    if (bar_length > graph_width) bar_length = graph_width;
+
+    printf("\r[");
+    for (int i = 0; i < bar_length; i++)
+    {
+        if (use_color)
+            printf("%s#%s", RED, RESET);
+        else
+            printf("#");
+    }
+    printf("] %.3Lf ms", current_delay_ns / 1000000.0);
+    fflush(stdout);
 }
 
 /**
@@ -355,6 +382,11 @@ static void do_rt_task(struct period_info* pinfo, FILE* log_file, bool use_color
             fflush(log_file);
         }
     }
+
+    /*if (print_info || period_exceeded)
+    {
+        draw_delay_graph(pinfo, delay_ns, 50, use_color);
+    }*/
     
     if (print_stats)
     {
@@ -376,7 +408,11 @@ void* simple_cyclic_task(void* data)
     struct sched_param sp;
     long tid = syscall(SYS_gettid);
     int policy = sched_getscheduler(tid);
-    int priority = sched_getparam(0, &sp) ? 0 : sp.sched_priority;
+    int priority;
+    if (sched_getparam(0, &sp) == 0)
+        priority = sp.sched_priority;
+    else
+        priority = 0;
     
     print_logo(tid, policy, priority, (long double)tdata->period_ns / 1000000, 
               tdata->print_per_sec, tdata->stress_threads, tdata->duration_sec, 
@@ -568,7 +604,7 @@ int main(int argc, char* argv[])
     }
 
     /* Lock memory */
-    if (mlockall(MCL_CURRENT | MCL_FUTURE))
+    if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0)
     {
         perror("mlockall failed");
         exit(EXIT_FAILURE);

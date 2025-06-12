@@ -1,6 +1,6 @@
 # Real Time Tester
  
-*A tool for testing real-time performance under Linux with SCHED_FIFO scheduling*
+*A tool for testing real-time performance under Linux with SCHED_FIFO, SCHED_RR scheduling*
 
 ## Description
 
@@ -44,14 +44,14 @@ cd rt-tester
 ./rt-tester [options]
 
 Options:
-    -p, --period MS       Set task period in milliseconds (default: 100)
-    -r, --rate HZ       Set task rate in Hertz (default: 5)
-    -d, --duration SEC    Set test duration in seconds (default: 0)
-    -s, --stress N      Set number of stress threads (default: 0)
-    --policy POL  Set scheduling policy (FIFO, RR, OTHER, default: FIFO)
-    --priority PRI      Set task priority (default: 80)
-    -l, --log FILE      Log results to specified file
-    --no-color       Disable colored output
-    -i, --info         Show platform information
-    -h, --help         Show this help message
+    -p, --period MS         Set task period in milliseconds (default: 100)
+    -r, --rate HZ           Set task rate in Hertz (default: 5)
+    -d, --duration SEC      Set test duration in seconds (default: 0)
+    -s, --stress N          Set number of stress threads (default: 0)
+    -pol, --policy POL      Set scheduling policy FIFO, RR, or OTHER (default: FIFO)
+    -pri, --priority PRI    Set task priority (default: 80)
+    -l, --log FILE          Log results to specified file
+    -nc, --no-color         Disable colored output
+    -i, --info              Show platform information
+    -h, --help              Show this help message
 ```

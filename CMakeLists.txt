@@ -4,5 +4,8 @@
 cmake_minimum_required (VERSION 3.8)
 project ("rt-tester")
 
+# Set the C++ standard
+set(CMAKE_CXX_STANDARD 23)
+
 # Include sub-projects.
 add_subdirectory ("rt-tester")
